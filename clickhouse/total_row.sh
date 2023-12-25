@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ##########################################################################################
-# Script Name: read.sh
+# Script Name: total_row.sh
 # Description: This Bash script connects to a ClickHouse database server
 # using provided connection details and retrieves a list of databases, tables, and rows.
 # Author: Sudoix
