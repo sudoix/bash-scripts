@@ -2,62 +2,72 @@
 
 ##########################################################################################
 # Script Name: total_row.sh
-# Description: This Bash script connects to a ClickHouse database server
-# using provided connection details and retrieves a list of databases, tables, and rows.
+# Description: This Bash script connects to a ClickHouse database server, retrieves and 
+# logs details of databases, tables, row counts, and sizes.
 # Author: Sudoix
 # Date: December 25, 2023
-# Version: 1.0
+# Version: 2.0
 #
-# This script assumes you have the clickhouse-client tool installed on your system,\
-# which is used to interact with the ClickHouse server via SQL queries.
+# Dependencies: clickhouse-client
 ##########################################################################################
 
-# Define your ClickHouse connection details
+# ClickHouse connection details
 CH_HOST="YOUR SERVER IP OR NAME"
 CH_PORT="9000"
 # CH_USER="your_user"
 # CH_PASSWORD="your_password"
 
-# Get a list of databases
+# Log file setup
+LOG_DIR="/var/log/clickhouse_stats"
+mkdir -p $LOG_DIR
+LOG_FILE="$LOG_DIR/clickhouse_stats_$(date +'%Y%m%d').log"
+
+# Function to write logs
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" | tee -a $LOG_FILE
+}
+
+# Retrieve and log database list
+log "Retrieving list of databases..."
 DATABASES=$(clickhouse-client --host "$CH_HOST" --port "$CH_PORT" --query "SHOW DATABASES" | grep -v system)
-echo $DATABASES
+log "Databases found: $DATABASES"
 
+# Initialize grand total variables
+GRAND_TOTAL_ROW_COUNT=0
+GRAND_TOTAL_SIZE=0
 
-# Loop through the databases
+# Process each database
 for DATABASE in $DATABASES; do
-    # Set the current database
     CH_DATABASE="$DATABASE"
-    echo "Using database $CH_DATABASE" >> listdatabases.txt
-    # Get a list of tables in the current database
-    TABLES=$(clickhouse-client --host "$CH_HOST" --port "$CH_PORT"  --database "$CH_DATABASE" --query "SHOW TABLES")
+    log "Processing database: $CH_DATABASE"
 
-    # Initialize a variable to store the total row count for the current database
+    # Retrieve and log table list
+    TABLES=$(clickhouse-client --host "$CH_HOST" --port "$CH_PORT" --database "$CH_DATABASE" --query "SHOW TABLES")
+    log "Tables in $CH_DATABASE: $TABLES"
+
     TOTAL_ROW_COUNT=0
+    TOTAL_DB_SIZE=0
 
-    # Loop through the tables in the current database
+    # Process each table
     for TABLE in $TABLES; do
-        # Get the row count for the current table
-        ROW_COUNT=$(clickhouse-client --host "$CH_HOST" --port "$CH_PORT"  --database "$CH_DATABASE" --query "SELECT COUNT(*) FROM $TABLE")
-        echo "Database: $DATABASE, Table: $TABLE, Row Count: $ROW_COUNT" >> row_count.txt
+        ROW_COUNT=$(clickhouse-client --host "$CH_HOST" --port "$CH_PORT" --database "$CH_DATABASE" --query "SELECT COUNT(*) FROM $TABLE")
+        log "Database: $DATABASE, Table: $TABLE, Row Count: $ROW_COUNT"
 
-        # Add the row count to the total for the current database
         TOTAL_ROW_COUNT=$((TOTAL_ROW_COUNT + ROW_COUNT))
     done
 
-    # Print the total row count for the current database
-    echo "Database: $DATABASE, Total Row Count: $TOTAL_ROW_COUNT" >> total_row_count.txt
-
-    # Add the total row count for the current database to the grand total
+    # Log total row count for the database
+    log "Database: $DATABASE, Total Row Count: $TOTAL_ROW_COUNT"
     GRAND_TOTAL_ROW_COUNT=$((GRAND_TOTAL_ROW_COUNT + TOTAL_ROW_COUNT))
-    echo "Total row of all databases is: $GRAND_TOTAL_ROW_COUNT" >>  total.txt
 
-    # Calculate the total size of the current database and add it to the total database size
+    # Calculate and log total size of the database
     DATABASE_SIZE=$(clickhouse-client --host "$CH_HOST" --port "$CH_PORT" --database "$CH_DATABASE" --query "SELECT formatReadableSize(sum(bytes)) FROM system.parts")
+    log "Database: $CH_DATABASE, Total Size: $DATABASE_SIZE"
 
-    # Print the total size of the current database
-    echo "Database: $CH_DATABASE, Total Size: $DATABASE_SIZE"
+    # Update grand totals
+    GRAND_TOTAL_SIZE=$(echo "$GRAND_TOTAL_SIZE + $DATABASE_SIZE" | bc)
 done
 
-# Print the grand total row count and total database size
-echo "Grand Total Row Count: $GRAND_TOTAL_ROW_COUNT"
-echo "Total Database Size: $DATABASE_SIZE"
+# Log grand totals
+log "Grand Total Row Count: $GRAND_TOTAL_ROW_COUNT"
+log "Grand Total Database Size: $GRAND_TOTAL_SIZE"
