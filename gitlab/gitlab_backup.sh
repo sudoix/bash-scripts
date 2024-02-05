@@ -1,12 +1,10 @@
 #!/bin/bash
 
 # Constants
-LOG_FILE="/path/to/your/gitlab_backup_$(date +%Y%m%d%H%M%S).log"
+LOG_FILE="/var/log/gitlab_backup_$(date +%Y%m%d%H%M%S).log"
 BACKUP_DIRECTORY="/data/gitlab/data/backups"
 REMOTE_HOST="ubuntu@172.24.65.81"
 REMOTE_DIRECTORY="/home/ubuntu/backup"
-DATE=$(date +"%Y%m%d%H%M%S")
-ARCHIVE_NAME="gitlab_backup_$DATE.tar.gz"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 echo "[$(date)] Script started."
@@ -30,18 +28,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Compress Backup Files
-echo "[$(date)] Compressing backup files..."
-tar -czf "$BACKUP_DIRECTORY/$ARCHIVE_NAME" -C "$BACKUP_DIRECTORY" .
-
-if [ $? -ne 0 ]; then
-    echo "[$(date)] Compression failed. Exiting."
-    exit 1
-fi
-
 # Transfer
 echo "[$(date)] Transferring backup to remote server..."
-scp "$BACKUP_DIRECTORY/$ARCHIVE_NAME" "$REMOTE_HOST:$REMOTE_DIRECTORY"
+rsync -avz --progress --remove-source-files "$BACKUP_DIRECTORY/" "$REMOTE_HOST:$REMOTE_DIRECTORY"
 
 if [ $? -ne 0 ]; then
     echo "[$(date)] Transfer failed. Exiting."
