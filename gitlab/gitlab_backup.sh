@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Constants
+LOG_FILE="/path/to/your/gitlab_backup_$(date +%Y%m%d%H%M%S).log"
+BACKUP_DIRECTORY="/data/gitlab/data/backups"
+REMOTE_HOST="ubuntu@172.24.65.81"
+REMOTE_DIRECTORY="/home/ubuntu/backup"
+DATE=$(date +"%Y%m%d%H%M%S")
+ARCHIVE_NAME="gitlab_backup_$DATE.tar.gz"
+
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "[$(date)] Script started."
+
+# Find GitLab Docker container name
+DOCKER_GITLAB_CONTAINER_NAME=$(docker ps --format "{{.Names}}\t{{.Image}}" | grep gitlab-ce | cut -f1)
+
+if [ -z "$DOCKER_GITLAB_CONTAINER_NAME" ]; then
+    echo "[$(date)] GitLab container not found. Exiting."
+    exit 1
+fi
+
+echo "[$(date)] Found GitLab container: $DOCKER_GITLAB_CONTAINER_NAME"
+
+# Backup
+echo "[$(date)] Creating GitLab backup..."
+docker exec "$DOCKER_GITLAB_CONTAINER_NAME" gitlab-backup create
+
+if [ $? -ne 0 ]; then
+    echo "[$(date)] Backup failed. Exiting."
+    exit 1
+fi
+
+# Compress Backup Files
+echo "[$(date)] Compressing backup files..."
+tar -czf "$BACKUP_DIRECTORY/$ARCHIVE_NAME" -C "$BACKUP_DIRECTORY" .
+
+if [ $? -ne 0 ]; then
+    echo "[$(date)] Compression failed. Exiting."
+    exit 1
+fi
+
+# Transfer
+echo "[$(date)] Transferring backup to remote server..."
+scp "$BACKUP_DIRECTORY/$ARCHIVE_NAME" "$REMOTE_HOST:$REMOTE_DIRECTORY"
+
+if [ $? -ne 0 ]; then
+    echo "[$(date)] Transfer failed. Exiting."
+    exit 1
+fi
+
+# Cleanup
+echo "[$(date)] Cleaning up local backup files..."
+rm -rf "$BACKUP_DIRECTORY"/*
+
+if [ $? -ne 0 ]; then
+    echo "[$(date)] Cleanup failed."
+    exit 1
+fi
+
+echo "[$(date)] Backup process completed successfully."
+
+
+
+
+# docker exec `docker ps --format "{{.Names}}\t {{.Image}}" | grep gitlab-ce | cut -d' ' -f1` gitlab-backup create
+
+# scp /data/gitlab/data/backups/* ubuntu@172.24.65.81:/home/ubuntu/backup/
+
+# rm -rf /data/gitlab/data/backups/*
