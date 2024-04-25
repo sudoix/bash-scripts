@@ -1,0 +1,12 @@
+[Unit]
+Description=Find primary mongodb and set virtual IP on server
+
+[Service]
+Type=simple
+ExecStart=/usr/local/src/find_primary_set_ip.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
