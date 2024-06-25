@@ -43,12 +43,23 @@ log_message() {
 }
 
 while true; do
-    # Execute MongoDB command to get primary node's address
-    PRIMARY_IP=$(mongosh -u $MONGO_USER -p $MONGO_PASSWORD --host $MONGO_HOST --authenticationDatabase $MONGO_AUTH_DB --eval "printjson(rs.isMaster().primary)" | awk -F':' '{print $1}' 2>>$LOG_FILE)
+    # Check MongoDB port and retrieve primary node's address if port is open
+    PRIMARY_IP=$(nc -z $MONGO_HOST 27017 && mongosh -u $MONGO_USER -p $MONGO_PASSWORD --host $MONGO_HOST --authenticationDatabase $MONGO_AUTH_DB --eval "printjson(rs.isMaster().primary)" | tail -n -1 | awk -F':' '{print $1}' 2>>$LOG_FILE)
+
+    # Check if PRIMARY_IP is empty (which means MongoDB port is down or node is not primary)
     if [ -z "$PRIMARY_IP" ]; then
-       log_message "Failed to retrieve primary IP from MongoDB"
-       sleep 5
-       continue
+        log_message "MongoDB port 27017 is down or this node is not primary."
+        
+        # If IP is set, remove it
+        if ip addr show $NET_INTERFACE | grep $TARGET_IP > /dev/null; then
+            ip addr del $TARGET_IP/24 dev $NET_INTERFACE
+            log_message "IP $TARGET_IP has been removed from $NET_INTERFACE."
+        else
+            log_message "No changes made; IP $TARGET_IP was not set on $NET_INTERFACE."
+        fi
+
+        sleep 5
+        continue
     fi
 
     log_message "Primary IP: $PRIMARY_IP"
