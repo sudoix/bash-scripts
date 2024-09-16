@@ -1,16 +1,14 @@
 #!/bin/bash
 
 # Constants
-LOG_FILE="/var/log/gitlab_backup_$(date +%Y%m%d%H%M%S).log"
 BACKUP_DIRECTORY="/data/gitlab/data/backups"
-REMOTE_HOST="ubuntu@172.24.65.81"
+REMOTE_HOST="ubuntu@172.24.65.81" # chenge User@IP to your remote server user and IP
 REMOTE_DIRECTORY="/home/ubuntu/backup"
 
-exec > >(tee -a "$LOG_FILE") 2>&1
 echo "[$(date)] Script started."
 
 # Find GitLab Docker container name
-DOCKER_GITLAB_CONTAINER_NAME=$(docker ps --format "{{.Names}}\t{{.Image}}" | grep gitlab-ce | cut -f1)
+DOCKER_GITLAB_CONTAINER_NAME=$(docker ps --format "{{.Names}}\t{{.Image}}" | grep gitlab | cut -f1) # chenge gitlab-ce to your container name
 
 if [ -z "$DOCKER_GITLAB_CONTAINER_NAME" ]; then
     echo "[$(date)] GitLab container not found. Exiting."
